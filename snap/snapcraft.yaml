@@ -1,0 +1,64 @@
+name: qcs410-kernel
+summary: A QCS410  BSP board kernel for use with Ubuntu Core 20
+description: |
+  This is my-snap's description. You have a paragraph or two to tell the
+  most important story about your snap. Keep it under 100 words though,
+  we live in tweetspace and your description wants to look good in the snap
+  store.
+adopt-info: kernel
+build-base: core20
+grade: stable
+confinement: strict
+type: kernel
+architectures:
+  - build-on:
+    - arm64
+    run-on: arm64
+
+parts:
+  patch:
+    plugin: dump
+    source: patches
+
+
+  kernel:
+    plugin: x-kernel
+    source: https://git.codelinaro.org/clo/la/kernel/msm-5.4.git
+    #source-branch: int/alex/visionfive_Ubuntu-unstable-5.17.0-8.8
+    source-tag: LE.UM.6.2.4.r1-04300-QCS610.0
+    source-depth: 1
+    kernel-compiler: aarch64-linux-gnu-gcc
+    kernel-with-firmware: false
+    kernel-image-target: Image
+#    kernel-initrd-channel: stable
+#    kernel-initrd-compression: gz
+#    kernel-device-trees:
+#      - starfive/jh7100-starfive-visionfive-v1
+    kconfigflavour: generic
+    kconfigs:
+      - CONFIG_SYSTEM_REVOCATION_KEYS=""
+      - CONFIG_SYSTEM_TRUSTED_KEYS=""
+      - CONFIG_DEBUG_INFO_BTF=n
+      - CONFIG_DEBUG_INFO=n
+      - CONFIG_NLS_ISO8859_1=y
+    override-build: |
+      #cp $SNAPCRAFT_PROJECT_DIR/parts/patch/src/disable_strict-prototypes.patch $SNAPCRAFT_PART_SRC
+      cd $SNAPCRAFT_PART_SRC
+      #git apply disable_strict-protptypes.patch
+      cp $SNAPCRAFT_PROJECT_DIR/.config $SNAPCRAFT_PART_BUILD
+      cd $SNAPCRAFT_PART_BUILD
+      snapcraftctl build
+      VER="$(strings vmlinux|grep "Linux version 5"|cut -d' ' -f3)"
+      snapcraftctl set-version "$VER"
+
+
+    build-packages:
+      - flex
+      - bison
+      - binutils
+      - libssl-dev
+      - binutils-aarch64-linux-gnu
+      - on amd64:
+        - gcc-aarch64-linux-gnu
+      - else:
+        - gcc
