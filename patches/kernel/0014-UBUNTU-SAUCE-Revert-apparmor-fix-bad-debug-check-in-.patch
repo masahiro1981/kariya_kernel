@@ -1,0 +1,33 @@
+From 53d744e69129e53a80d34a71120f16b50e11be7e Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 15:30:58 -0700
+Subject: [PATCH 14/31] UBUNTU: SAUCE: Revert "apparmor: fix bad debug check in
+ apparmor_secid_to_secctx()"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit edf4e7b7b9104b58fddfcd073bd7dcc1585d5326.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/secid.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/security/apparmor/secid.c b/security/apparmor/secid.c
+index 3ddfcb72e256..f8ec1691615d 100644
+--- a/security/apparmor/secid.c
++++ b/security/apparmor/secid.c
+@@ -74,6 +74,7 @@ int apparmor_secid_to_secctx(u32 secid, char **secdata, u32 *seclen)
+ 	struct aa_label *label = aa_secid_to_label(secid);
+ 	int len;
+ 
++	AA_BUG(!secdata);
+ 	AA_BUG(!seclen);
+ 
+ 	if (!label)
+-- 
+2.25.1
+

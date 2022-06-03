@@ -1,0 +1,169 @@
+From 9de48f5f9b641bba25e8987c1207928da41cf8aa Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 15:19:37 -0700
+Subject: [PATCH 12/31] UBUNTU: SAUCE: Revert "apparmor: Parse secmark policy"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit 9caafbe2b4cf4c635826a2832e93cf648605de8b.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/include/net.h    | 10 -----
+ security/apparmor/include/policy.h |  3 --
+ security/apparmor/policy.c         |  3 --
+ security/apparmor/policy_unpack.c  | 67 ------------------------------
+ 4 files changed, 83 deletions(-)
+
+diff --git a/security/apparmor/include/net.h b/security/apparmor/include/net.h
+index ff259a3dae97..baa7a06fc4c2 100644
+--- a/security/apparmor/include/net.h
++++ b/security/apparmor/include/net.h
+@@ -97,13 +97,6 @@ struct aa_net_compat {
+ 	__e;					\
+ })
+ 
+-struct aa_secmark {
+-	u8 audit;
+-	u8 deny;
+-	u32 secid;
+-	char *label;
+-};
+-
+ extern struct aa_sfs_entry aa_sfs_entry_network[];
+ extern struct aa_sfs_entry aa_sfs_entry_network_compat[];
+ 
+@@ -125,7 +118,4 @@ int aa_sk_perm(const char *op, u32 request, struct sock *sk);
+ int aa_sock_file_perm(struct aa_label *label, const char *op, u32 request,
+ 		      struct socket *sock);
+ 
+-int apparmor_secmark_check(struct aa_label *label, char *op, u32 request,
+-			   u32 secid, struct sock *sk);
+-
+ #endif /* __AA_NET_H */
+diff --git a/security/apparmor/include/policy.h b/security/apparmor/include/policy.h
+index f1c9cdc49a0d..8a60a81fefa3 100644
+--- a/security/apparmor/include/policy.h
++++ b/security/apparmor/include/policy.h
+@@ -153,9 +153,6 @@ struct aa_profile {
+ 
+ 	struct aa_rlimit rlimits;
+ 
+-	int secmark_count;
+-	struct aa_secmark *secmark;
+-
+ 	struct aa_loaddata *rawdata;
+ 	unsigned char *hash;
+ 	char *dirname;
+diff --git a/security/apparmor/policy.c b/security/apparmor/policy.c
+index 722e6d516d03..c0b02e4211e6 100644
+--- a/security/apparmor/policy.c
++++ b/security/apparmor/policy.c
+@@ -227,9 +227,6 @@ void aa_free_profile(struct aa_profile *profile)
+ 	for (i = 0; i < profile->xattr_count; i++)
+ 		kzfree(profile->xattrs[i]);
+ 	kzfree(profile->xattrs);
+-	for (i=0; i < profile->secmark_count; i++)
+-		kzfree(profile->secmark[i].label);
+-	kzfree(profile->secmark);
+ 	kzfree(profile->dirname);
+ 	aa_put_dfa(profile->xmatch);
+ 	aa_put_dfa(profile->policy.dfa);
+diff --git a/security/apparmor/policy_unpack.c b/security/apparmor/policy_unpack.c
+index c09425262d43..e65a1ac598ad 100644
+--- a/security/apparmor/policy_unpack.c
++++ b/security/apparmor/policy_unpack.c
+@@ -293,24 +293,6 @@ static bool unpack_nameX(struct aa_ext *e, enum aa_code code, const char *name)
+ 	return 0;
+ }
+ 
+-static bool unpack_u8(struct aa_ext *e, u8 *data, const char *name)
+-{
+-	void *pos = e->pos;
+-
+-	if (unpack_nameX(e, AA_U8, name)) {
+-		if (!inbounds(e, sizeof(u8)))
+-			goto fail;
+-		if (data)
+-			*data = get_unaligned((u8 *)e->pos);
+-		e->pos += sizeof(u8);
+-		return 1;
+-	}
+-
+-fail:
+-	e->pos = pos;
+-	return 0;
+-}
+-
+ static bool unpack_u16(struct aa_ext *e, u16 *data, const char *name)
+ {
+ 	if (unpack_nameX(e, AA_U16, name)) {
+@@ -582,50 +564,6 @@ static bool unpack_xattrs(struct aa_ext *e, struct aa_profile *profile)
+ 	return 0;
+ }
+ 
+-static bool unpack_secmark(struct aa_ext *e, struct aa_profile *profile)
+-{
+-	void *pos = e->pos;
+-	int i, size;
+-
+-	if (unpack_nameX(e, AA_STRUCT, "secmark")) {
+-		size = unpack_array(e, NULL);
+-
+-		profile->secmark = kcalloc(size, sizeof(struct aa_secmark),
+-					   GFP_KERNEL);
+-		if (!profile->secmark)
+-			goto fail;
+-
+-		profile->secmark_count = size;
+-
+-		for (i = 0; i < size; i++) {
+-			if (!unpack_u8(e, &profile->secmark[i].audit, NULL))
+-				goto fail;
+-			if (!unpack_u8(e, &profile->secmark[i].deny, NULL))
+-				goto fail;
+-			if (!unpack_strdup(e, &profile->secmark[i].label, NULL))
+-				goto fail;
+-		}
+-		if (!unpack_nameX(e, AA_ARRAYEND, NULL))
+-			goto fail;
+-		if (!unpack_nameX(e, AA_STRUCTEND, NULL))
+-			goto fail;
+-	}
+-
+-	return 1;
+-
+-fail:
+-	if (profile->secmark) {
+-		for (i = 0; i < size; i++)
+-			kfree(profile->secmark[i].label);
+-		kfree(profile->secmark);
+-		profile->secmark_count = 0;
+-		profile->secmark = NULL;
+-	}
+-
+-	e->pos = pos;
+-	return 0;
+-}
+-
+ static bool unpack_rlimits(struct aa_ext *e, struct aa_profile *profile)
+ {
+ 	void *pos = e->pos;
+@@ -824,11 +762,6 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
+ 		goto fail;
+ 	}
+ 
+-	if (!unpack_secmark(e, profile)) {
+-		info = "failed to unpack profile secmark rules";
+-		goto fail;
+-	}
+-
+ 	size = unpack_array(e, "net_allowed_af");
+ 	if (size || VERSION_LT(e->version, v8)) {
+ 		profile->net_compat = kzalloc(sizeof(struct aa_net_compat), GFP_KERNEL);
+-- 
+2.25.1
+

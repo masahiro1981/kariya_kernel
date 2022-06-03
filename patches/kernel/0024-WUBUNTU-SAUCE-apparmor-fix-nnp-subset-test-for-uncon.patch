@@ -1,0 +1,40 @@
+From 32f5076092a62b27546f750b9cdb6f73cf3ca7c6 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 3 Oct 2019 12:14:35 -0700
+Subject: [PATCH 24/31] WUBUNTU: SAUCE: apparmor: fix nnp subset test for
+ unconfined
+
+The subset test is not taking into account the unconfined exception
+which will cause profile transitions in the stacked confinement
+case to fail when no_new_privs is applied.
+
+This fixes a regression introduced in the 4.17 kernel caused by the
+reworking of domain transitions.
+
+Fixes: 9fcf78cca1986 ("apparmor: update domain transitions that are subsets of confinement at nnp")
+BugLink: https://bugs.launchpad.net/bugs/1844186
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Acked-by: Tyler Hicks <tyhicks@canonical.com>
+Acked-by: Stefan Bader <stefan.bader@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/domain.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/security/apparmor/domain.c b/security/apparmor/domain.c
+index 1a33f490e667..d9b61de15a9c 100644
+--- a/security/apparmor/domain.c
++++ b/security/apparmor/domain.c
+@@ -935,8 +935,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
+ 	 * aways results in a further reduction of permissions.
+ 	 */
+ 	if ((bprm->unsafe & LSM_UNSAFE_NO_NEW_PRIVS) &&
+-	    !unconfined(label) &&
+-	    !aa_label_is_unconfined_subset(new, ctx->nnp)) {
++	    !unconfined(label) && !aa_label_is_unconfined_subset(new, ctx->nnp)) {
+ 		error = -EPERM;
+ 		info = "no new privs";
+ 		goto audit;
+-- 
+2.25.1
+

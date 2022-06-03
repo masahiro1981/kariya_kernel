@@ -1,0 +1,109 @@
+From a3c99d24da1a765b13a927969527f931914a836e Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 13:42:47 -0700
+Subject: [PATCH 10/31] UBUNTU: SAUCE: Revert "apparmor: add #ifdef checks for
+ secmark filtering"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit e1af4779617928efa84562de4de5dc071e7deb08.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/lsm.c | 10 ----------
+ security/apparmor/net.c |  2 --
+ 2 files changed, 12 deletions(-)
+
+diff --git a/security/apparmor/lsm.c b/security/apparmor/lsm.c
+index de90d6be5137..60b1e7ac3291 100644
+--- a/security/apparmor/lsm.c
++++ b/security/apparmor/lsm.c
+@@ -1097,7 +1097,6 @@ static int apparmor_socket_shutdown(struct socket *sock, int how)
+ 	return aa_sock_perm(OP_SHUTDOWN, AA_MAY_SHUTDOWN, sock);
+ }
+ 
+-#ifdef CONFIG_NETWORK_SECMARK
+ /**
+  * apparmor_socket_sock_recv_skb - check perms before associating skb to sk
+  *
+@@ -1116,7 +1115,6 @@ static int apparmor_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+ 	return apparmor_secmark_check(ctx->label, OP_RECVMSG, AA_MAY_RECEIVE,
+ 				      skb->secmark, sk);
+ }
+-#endif
+ 
+ 
+ static struct aa_label *sk_peer_label(struct sock *sk)
+@@ -1228,7 +1226,6 @@ static void apparmor_sock_graft(struct sock *sk, struct socket *parent)
+ 		ctx->label = aa_get_current_label();
+ }
+ 
+-#ifdef CONFIG_NETWORK_SECMARK
+ static int apparmor_inet_conn_request(struct sock *sk, struct sk_buff *skb,
+ 				      struct request_sock *req)
+ {
+@@ -1240,7 +1237,6 @@ static int apparmor_inet_conn_request(struct sock *sk, struct sk_buff *skb,
+ 	return apparmor_secmark_check(ctx->label, OP_CONNECT, AA_MAY_CONNECT,
+ 				      skb->secmark, sk);
+ }
+-#endif
+ 
+ /*
+  * The cred blob is a pointer to, not an instance of, an aa_task_ctx.
+@@ -1305,17 +1301,13 @@ static struct security_hook_list apparmor_hooks[] __lsm_ro_after_init = {
+ 	LSM_HOOK_INIT(socket_getsockopt, apparmor_socket_getsockopt),
+ 	LSM_HOOK_INIT(socket_setsockopt, apparmor_socket_setsockopt),
+ 	LSM_HOOK_INIT(socket_shutdown, apparmor_socket_shutdown),
+-#ifdef CONFIG_NETWORK_SECMARK
+ 	LSM_HOOK_INIT(socket_sock_rcv_skb, apparmor_socket_sock_rcv_skb),
+-#endif
+ 	LSM_HOOK_INIT(socket_getpeersec_stream,
+ 		      apparmor_socket_getpeersec_stream),
+ 	LSM_HOOK_INIT(socket_getpeersec_dgram,
+ 		      apparmor_socket_getpeersec_dgram),
+ 	LSM_HOOK_INIT(sock_graft, apparmor_sock_graft),
+-#ifdef CONFIG_NETWORK_SECMARK
+ 	LSM_HOOK_INIT(inet_conn_request, apparmor_inet_conn_request),
+-#endif
+ 
+ 	LSM_HOOK_INIT(cred_alloc_blank, apparmor_cred_alloc_blank),
+ 	LSM_HOOK_INIT(cred_free, apparmor_cred_free),
+@@ -1712,7 +1704,6 @@ static inline int apparmor_init_sysctl(void)
+ }
+ #endif /* CONFIG_SYSCTL */
+ 
+-#if defined(CONFIG_NETFILTER) && defined(CONFIG_NETWORK_SECMARK)
+ static unsigned int apparmor_ip_postroute(void *priv,
+ 					  struct sk_buff *skb,
+ 					  const struct nf_hook_state *state)
+@@ -1801,7 +1792,6 @@ static int __init apparmor_nf_ip_init(void)
+ 	return 0;
+ }
+ __initcall(apparmor_nf_ip_init);
+-#endif
+ 
+ static int __init apparmor_init(void)
+ {
+diff --git a/security/apparmor/net.c b/security/apparmor/net.c
+index 297589c6dc95..884cdd02adbe 100644
+--- a/security/apparmor/net.c
++++ b/security/apparmor/net.c
+@@ -254,7 +254,6 @@ int aa_sock_file_perm(struct aa_label *label, const char *op, u32 request,
+ 			 aa_label_sk_perm(label, op, request, sock->sk));
+ }
+ 
+-#ifdef CONFIG_NETWORK_SECMARK
+ static int apparmor_secmark_init(struct aa_secmark *secmark)
+ {
+ 	struct aa_label *label;
+@@ -319,4 +318,3 @@ int apparmor_secmark_check(struct aa_label *label, char *op, u32 request,
+ 				    aa_secmark_perm(profile, request, secid,
+ 						    &sa, sk));
+ }
+-#endif
+-- 
+2.25.1
+

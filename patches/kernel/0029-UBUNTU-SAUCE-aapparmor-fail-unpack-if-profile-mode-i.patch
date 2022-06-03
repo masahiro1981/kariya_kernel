@@ -1,0 +1,37 @@
+From 994f8016698389137c2981dfeed3572ccef3c7fb Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 19 Dec 2019 15:55:39 -0800
+Subject: [PATCH 29/31] UBUNTU: SAUCE: aapparmor: fail unpack if profile mode
+ is unknown
+
+Profile unpack should fail if the profile mode is not a mode that the
+kernel understands.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/policy_unpack.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/security/apparmor/policy_unpack.c b/security/apparmor/policy_unpack.c
+index e65a1ac598ad..ac1025102365 100644
+--- a/security/apparmor/policy_unpack.c
++++ b/security/apparmor/policy_unpack.c
+@@ -696,10 +696,14 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
+ 		goto fail;
+ 	if (tmp == PACKED_MODE_COMPLAIN || (e->version & FORCE_COMPLAIN_FLAG))
+ 		profile->mode = APPARMOR_COMPLAIN;
++	else if (tmp == PACKED_MODE_ENFORCE)
++		profile->mode = APPARMOR_ENFORCE;
+ 	else if (tmp == PACKED_MODE_KILL)
+ 		profile->mode = APPARMOR_KILL;
+ 	else if (tmp == PACKED_MODE_UNCONFINED)
+ 		profile->mode = APPARMOR_UNCONFINED;
++	else
++		goto fail;
+ 	if (!unpack_u32(e, &tmp, NULL))
+ 		goto fail;
+ 	if (tmp)
+-- 
+2.25.1
+

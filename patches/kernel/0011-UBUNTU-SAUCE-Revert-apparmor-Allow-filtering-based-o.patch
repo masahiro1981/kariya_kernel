@@ -1,0 +1,253 @@
+From 8ab98d405eed82c97370a0a61c57708c42bba7b5 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 13:45:05 -0700
+Subject: [PATCH 11/31] UBUNTU: SAUCE: Revert "apparmor: Allow filtering based
+ on secmark policy"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit ab9f2115081ab7ba63b77a759e0f3eb5d6463d7f.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/lsm.c | 111 +---------------------------------------
+ security/apparmor/net.c |  66 ------------------------
+ 2 files changed, 1 insertion(+), 176 deletions(-)
+
+diff --git a/security/apparmor/lsm.c b/security/apparmor/lsm.c
+index 60b1e7ac3291..8844ba1c6dd5 100644
+--- a/security/apparmor/lsm.c
++++ b/security/apparmor/lsm.c
+@@ -19,8 +19,6 @@
+ #include <linux/sysctl.h>
+ #include <linux/audit.h>
+ #include <linux/user_namespace.h>
+-#include <linux/netfilter_ipv4.h>
+-#include <linux/netfilter_ipv6.h>
+ #include <net/sock.h>
+ #include <uapi/linux/mount.h>
+ 
+@@ -1107,13 +1105,7 @@ static int apparmor_socket_shutdown(struct socket *sock, int how)
+  */
+ static int apparmor_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+ {
+-	struct aa_sk_ctx *ctx = aa_sock(sk);
+-
+-	if (!skb->secmark)
+-		return 0;
+-
+-	return apparmor_secmark_check(ctx->label, OP_RECVMSG, AA_MAY_RECEIVE,
+-				      skb->secmark, sk);
++	return 0;
+ }
+ 
+ 
+@@ -1226,17 +1218,6 @@ static void apparmor_sock_graft(struct sock *sk, struct socket *parent)
+ 		ctx->label = aa_get_current_label();
+ }
+ 
+-static int apparmor_inet_conn_request(struct sock *sk, struct sk_buff *skb,
+-				      struct request_sock *req)
+-{
+-	struct aa_sk_ctx *ctx = aa_sock(sk);
+-
+-	if (!skb->secmark)
+-		return 0;
+-
+-	return apparmor_secmark_check(ctx->label, OP_CONNECT, AA_MAY_CONNECT,
+-				      skb->secmark, sk);
+-}
+ 
+ /*
+  * The cred blob is a pointer to, not an instance of, an aa_task_ctx.
+@@ -1307,7 +1288,6 @@ static struct security_hook_list apparmor_hooks[] __lsm_ro_after_init = {
+ 	LSM_HOOK_INIT(socket_getpeersec_dgram,
+ 		      apparmor_socket_getpeersec_dgram),
+ 	LSM_HOOK_INIT(sock_graft, apparmor_sock_graft),
+-	LSM_HOOK_INIT(inet_conn_request, apparmor_inet_conn_request),
+ 
+ 	LSM_HOOK_INIT(cred_alloc_blank, apparmor_cred_alloc_blank),
+ 	LSM_HOOK_INIT(cred_free, apparmor_cred_free),
+@@ -1704,95 +1684,6 @@ static inline int apparmor_init_sysctl(void)
+ }
+ #endif /* CONFIG_SYSCTL */
+ 
+-static unsigned int apparmor_ip_postroute(void *priv,
+-					  struct sk_buff *skb,
+-					  const struct nf_hook_state *state)
+-{
+-	struct aa_sk_ctx *ctx;
+-	struct sock *sk;
+-
+-	if (!skb->secmark)
+-		return NF_ACCEPT;
+-
+-	sk = skb_to_full_sk(skb);
+-	if (sk == NULL)
+-		return NF_ACCEPT;
+-
+-	ctx = aa_sock(sk);
+-	if (!apparmor_secmark_check(ctx->label, OP_SENDMSG, AA_MAY_SEND,
+-				    skb->secmark, sk))
+-		return NF_ACCEPT;
+-
+-	return NF_DROP_ERR(-ECONNREFUSED);
+-
+-}
+-
+-static unsigned int apparmor_ipv4_postroute(void *priv,
+-					    struct sk_buff *skb,
+-					    const struct nf_hook_state *state)
+-{
+-	return apparmor_ip_postroute(priv, skb, state);
+-}
+-
+-static unsigned int apparmor_ipv6_postroute(void *priv,
+-					    struct sk_buff *skb,
+-					    const struct nf_hook_state *state)
+-{
+-	return apparmor_ip_postroute(priv, skb, state);
+-}
+-
+-static const struct nf_hook_ops apparmor_nf_ops[] = {
+-	{
+-		.hook =         apparmor_ipv4_postroute,
+-		.pf =           NFPROTO_IPV4,
+-		.hooknum =      NF_INET_POST_ROUTING,
+-		.priority =     NF_IP_PRI_SELINUX_FIRST,
+-	},
+-#if IS_ENABLED(CONFIG_IPV6)
+-	{
+-		.hook =         apparmor_ipv6_postroute,
+-		.pf =           NFPROTO_IPV6,
+-		.hooknum =      NF_INET_POST_ROUTING,
+-		.priority =     NF_IP6_PRI_SELINUX_FIRST,
+-	},
+-#endif
+-};
+-
+-static int __net_init apparmor_nf_register(struct net *net)
+-{
+-	int ret;
+-
+-	ret = nf_register_net_hooks(net, apparmor_nf_ops,
+-				    ARRAY_SIZE(apparmor_nf_ops));
+-	return ret;
+-}
+-
+-static void __net_exit apparmor_nf_unregister(struct net *net)
+-{
+-	nf_unregister_net_hooks(net, apparmor_nf_ops,
+-				ARRAY_SIZE(apparmor_nf_ops));
+-}
+-
+-static struct pernet_operations apparmor_net_ops = {
+-	.init = apparmor_nf_register,
+-	.exit = apparmor_nf_unregister,
+-};
+-
+-static int __init apparmor_nf_ip_init(void)
+-{
+-	int err;
+-
+-	if (!apparmor_enabled)
+-		return 0;
+-
+-	err = register_pernet_subsys(&apparmor_net_ops);
+-	if (err)
+-		panic("Apparmor: register_pernet_subsys: error %d\n", err);
+-
+-	return 0;
+-}
+-__initcall(apparmor_nf_ip_init);
+-
+ static int __init apparmor_init(void)
+ {
+ 	int error;
+diff --git a/security/apparmor/net.c b/security/apparmor/net.c
+index 884cdd02adbe..0e32794c4f52 100644
+--- a/security/apparmor/net.c
++++ b/security/apparmor/net.c
+@@ -15,7 +15,6 @@
+ #include "include/label.h"
+ #include "include/net.h"
+ #include "include/policy.h"
+-#include "include/secid.h"
+ 
+ #include "net_names.h"
+ 
+@@ -253,68 +252,3 @@ int aa_sock_file_perm(struct aa_label *label, const char *op, u32 request,
+ 			 file_perm(label, op, request, sock),
+ 			 aa_label_sk_perm(label, op, request, sock->sk));
+ }
+-
+-static int apparmor_secmark_init(struct aa_secmark *secmark)
+-{
+-	struct aa_label *label;
+-
+-	if (secmark->label[0] == '*') {
+-		secmark->secid = AA_SECID_WILDCARD;
+-		return 0;
+-	}
+-
+-	label = aa_label_strn_parse(&root_ns->unconfined->label,
+-				    secmark->label, strlen(secmark->label),
+-				    GFP_ATOMIC, false, false);
+-
+-	if (IS_ERR(label))
+-		return PTR_ERR(label);
+-
+-	secmark->secid = label->secid;
+-
+-	return 0;
+-}
+-
+-static int aa_secmark_perm(struct aa_profile *profile, u32 request, u32 secid,
+-			   struct common_audit_data *sa, struct sock *sk)
+-{
+-	int i, ret;
+-	struct aa_perms perms = { };
+-
+-	if (profile->secmark_count == 0)
+-		return 0;
+-
+-	for (i = 0; i < profile->secmark_count; i++) {
+-		if (!profile->secmark[i].secid) {
+-			ret = apparmor_secmark_init(&profile->secmark[i]);
+-			if (ret)
+-				return ret;
+-		}
+-
+-		if (profile->secmark[i].secid == secid ||
+-		    profile->secmark[i].secid == AA_SECID_WILDCARD) {
+-			if (profile->secmark[i].deny)
+-				perms.deny = ALL_PERMS_MASK;
+-			else
+-				perms.allow = ALL_PERMS_MASK;
+-
+-			if (profile->secmark[i].audit)
+-				perms.audit = ALL_PERMS_MASK;
+-		}
+-	}
+-
+-	aa_apply_modes_to_perms(profile, &perms);
+-
+-	return aa_check_perms(profile, &perms, request, sa, audit_net_cb);
+-}
+-
+-int apparmor_secmark_check(struct aa_label *label, char *op, u32 request,
+-			   u32 secid, struct sock *sk)
+-{
+-	struct aa_profile *profile;
+-	DEFINE_AUDIT_SK(sa, op, sk);
+-
+-	return fn_for_each_confined(label, profile,
+-				    aa_secmark_perm(profile, request, secid,
+-						    &sa, sk));
+-}
+-- 
+2.25.1
+

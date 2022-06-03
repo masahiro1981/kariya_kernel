@@ -1,0 +1,47 @@
+From 686689357a5aa2df1775341288005e5a8de9efde Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Sat, 31 Aug 2019 15:55:06 -0700
+Subject: [PATCH 26/31] UBUNTU: SAUCE: apparmor: add a valid state flags check
+
+Add a check to ensure only known state flags are set on each
+state in the dfa.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/include/match.h | 4 ++++
+ security/apparmor/match.c         | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/security/apparmor/include/match.h b/security/apparmor/include/match.h
+index e23f4aadc1ff..f280b046361e 100644
+--- a/security/apparmor/include/match.h
++++ b/security/apparmor/include/match.h
+@@ -181,5 +181,9 @@ static inline void aa_put_dfa(struct aa_dfa *dfa)
+ 
+ #define MATCH_FLAG_DIFF_ENCODE 0x80000000
+ #define MARK_DIFF_ENCODE 0x40000000
++#define MATCH_FLAG_OOB_TRANSITION 0x20000000
++#define MATCH_FLAGS_MASK 0xff000000
++#define MATCH_FLAGS_VALID MATCH_FLAG_DIFF_ENCODE
++#define MATCH_FLAGS_INVALID (MATCH_FLAGS_MASK & ~MATCH_FLAGS_VALID)
+ 
+ #endif /* __AA_MATCH_H */
+diff --git a/security/apparmor/match.c b/security/apparmor/match.c
+index 5947b0a763c2..0612c77cb3d3 100644
+--- a/security/apparmor/match.c
++++ b/security/apparmor/match.c
+@@ -207,6 +207,10 @@ static int verify_dfa(struct aa_dfa *dfa)
+ 		if (!(BASE_TABLE(dfa)[i] & MATCH_FLAG_DIFF_ENCODE) &&
+ 		    (DEFAULT_TABLE(dfa)[i] >= state_count))
+ 			goto out;
++		if (BASE_TABLE(dfa)[i] & MATCH_FLAGS_INVALID) {
++			pr_err("AppArmor DFA state with invalid match flags");
++			goto out;
++		}
+ 		if (base_idx(BASE_TABLE(dfa)[i]) + 255 >= trans_count) {
+ 			pr_err("AppArmor DFA next/check upper bounds error\n");
+ 			goto out;
+-- 
+2.25.1
+

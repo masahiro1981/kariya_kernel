@@ -42,13 +42,18 @@ parts:
       - CONFIG_DEBUG_INFO=n
       - CONFIG_NLS_ISO8859_1=y
     override-build: |
-      cp -f $SNAPCRAFT_PROJECT_DIR/parts/patch/src/disable_strict-protptypes.patch $SNAPCRAFT_PART_SRC
+      cp -r $SNAPCRAFT_PROJECT_DIR/parts/patch/src/disable_strict-protptypes.patch  $SNAPCRAFT_PART_SRC
+      cp -r $SNAPCRAFT_PROJECT_DIR/parts/patch/src/kernel/* $SNAPCRAFT_PART_SRC
       cd $SNAPCRAFT_PART_SRC
       git apply disable_strict-protptypes.patch
+      rm disable_strict-protptypes.patch
+      git am *.patch
+
       cp $SNAPCRAFT_PROJECT_DIR/.config $SNAPCRAFT_PART_BUILD
       cd $SNAPCRAFT_PART_BUILD
       snapcraftctl build
-      VER="$(strings vmlinux|grep "Linux version 5"|cut -d' ' -f3)"
+      #VER="$(strings vmlinux|grep "Linux version 5"|cut -d' ' -f3)"
+      VER="5.4.161"
       snapcraftctl set-version "$VER"
 
 

@@ -1,0 +1,35 @@
+From 5dde45b087dbb6fb42c1016ca5f99c54467d5fb2 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Sat, 31 Aug 2019 15:55:45 -0700
+Subject: [PATCH 27/31] UBUNTU: SAUCE: aapparmor: add consistency check between
+ state and dfa diff encode flags
+
+Check that a states diff encode flag is only set if diff encode is
+enabled in the dfa header.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/match.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/security/apparmor/match.c b/security/apparmor/match.c
+index 0612c77cb3d3..beb64cf02c0c 100644
+--- a/security/apparmor/match.c
++++ b/security/apparmor/match.c
+@@ -211,6 +211,12 @@ static int verify_dfa(struct aa_dfa *dfa)
+ 			pr_err("AppArmor DFA state with invalid match flags");
+ 			goto out;
+ 		}
++		if ((BASE_TABLE(dfa)[i] & MATCH_FLAG_DIFF_ENCODE)) {
++			if (!(dfa->flags & YYTH_FLAG_DIFF_ENCODE)) {
++				pr_err("AppArmor DFA diff encoded transition state without header flag");
++				goto out;
++			}
++		}
+ 		if (base_idx(BASE_TABLE(dfa)[i]) + 255 >= trans_count) {
+ 			pr_err("AppArmor DFA next/check upper bounds error\n");
+ 			goto out;
+-- 
+2.25.1
+

@@ -1,0 +1,49 @@
+From c2291d279d689e74ab5b3c150303d8ee3cec8c16 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 15:26:19 -0700
+Subject: [PATCH 13/31] UBUNTU: SAUCE: Revert "apparmor: Add a wildcard secid"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit 617a629c08bfffb05249131079d9a38322902e5b.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/include/secid.h | 3 ---
+ security/apparmor/secid.c         | 3 ++-
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/security/apparmor/include/secid.h b/security/apparmor/include/secid.h
+index 48ff1ddecad5..6a29aa43e595 100644
+--- a/security/apparmor/include/secid.h
++++ b/security/apparmor/include/secid.h
+@@ -18,9 +18,6 @@ struct aa_label;
+ /* secid value that will not be allocated */
+ #define AA_SECID_INVALID 0
+ 
+-/* secid value that matches any other secid */
+-#define AA_SECID_WILDCARD 1
+-
+ struct aa_label *aa_secid_to_label(u32 secid);
+ int apparmor_secid_to_secctx(u32 secid, char **secdata, u32 *seclen);
+ int apparmor_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid);
+diff --git a/security/apparmor/secid.c b/security/apparmor/secid.c
+index ce545f99259e..3ddfcb72e256 100644
+--- a/security/apparmor/secid.c
++++ b/security/apparmor/secid.c
+@@ -27,7 +27,8 @@
+  * secids - do not pin labels with a refcount. They rely on the label
+  * properly updating/freeing them
+  */
+-#define AA_FIRST_SECID 2
++
++#define AA_FIRST_SECID 1
+ 
+ static DEFINE_IDR(aa_secids);
+ static DEFINE_SPINLOCK(secid_lock);
+-- 
+2.25.1
+

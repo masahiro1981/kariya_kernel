@@ -1,0 +1,42 @@
+From cfb9e9aedc92336061e91ccb673cbfb528a697af Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 15:38:18 -0700
+Subject: [PATCH 17/31] XUBUNTU: SAUCE: Revert "apparmor: Fix memory leak of
+ rule on error exit path"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit 52e8c38001d8ef0ca07ef428e480cd4a35e46abf.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/audit.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/security/apparmor/audit.c b/security/apparmor/audit.c
+index 597732503815..966e796459fe 100644
+--- a/security/apparmor/audit.c
++++ b/security/apparmor/audit.c
+@@ -196,13 +196,10 @@ int aa_audit_rule_init(u32 field, u32 op, char *rulestr, void **vrule)
+ 	/* Currently rules are treated as coming from the root ns */
+ 	rule->label = aa_label_parse(&root_ns->unconfined->label, rulestr,
+ 				     GFP_KERNEL, true, false);
+-	if (IS_ERR(rule->label)) {
+-		int err = PTR_ERR(rule->label);
+-		aa_audit_rule_free(rule);
+-		return err;
+-	}
+-
++	if (IS_ERR(rule->label))
++		return PTR_ERR(rule->label);
+ 	*vrule = rule;
++
+ 	return 0;
+ }
+ 
+-- 
+2.25.1
+

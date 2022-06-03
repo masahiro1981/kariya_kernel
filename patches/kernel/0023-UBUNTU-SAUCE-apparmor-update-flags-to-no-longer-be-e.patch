@@ -1,0 +1,31 @@
+From 3a1c03e596e6f8e3cf1cf768076f724b0b5275c1 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Fri, 15 Mar 2019 11:31:53 -0700
+Subject: [PATCH 23/31] UBUNTU: SAUCE: apparmor: update flags to no longer be
+ exclusive
+
+With blob sharing in place, and secid use reverted apparmor is no
+longer an exclusive LSM, so it can operate separately now.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/lsm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/security/apparmor/lsm.c b/security/apparmor/lsm.c
+index 683195e12ea3..f0f5a0068220 100644
+--- a/security/apparmor/lsm.c
++++ b/security/apparmor/lsm.c
+@@ -1724,7 +1724,7 @@ static int __init apparmor_init(void)
+ 
+ DEFINE_LSM(apparmor) = {
+ 	.name = "apparmor",
+-	.flags = LSM_FLAG_LEGACY_MAJOR | LSM_FLAG_EXCLUSIVE,
++	.flags = LSM_FLAG_LEGACY_MAJOR,
+ 	.enabled = &apparmor_enabled,
+ 	.blobs = &apparmor_blob_sizes,
+ 	.init = apparmor_init,
+-- 
+2.25.1
+

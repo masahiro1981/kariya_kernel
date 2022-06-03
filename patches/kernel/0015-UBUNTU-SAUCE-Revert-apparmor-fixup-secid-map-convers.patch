@@ -1,0 +1,126 @@
+From ccbe7f79a6d6dbb93d379515c4905b23956168a0 Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Thu, 14 Mar 2019 15:36:21 -0700
+Subject: [PATCH 15/31] UBUNTU: SAUCE: Revert "apparmor: fixup secid map
+ conversion to using IDR"
+
+Revert currently unused by Ubuntu apparmor features that require secid
+support, to enable apparmor LSM stacking with the 5.1 LSM stacking
+patchset.
+
+This reverts commit a4c3f89c9b5a9fab5a8e4ea05399acd6e23072df.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/include/secid.h |  4 +---
+ security/apparmor/label.c         |  3 ++-
+ security/apparmor/lsm.c           |  2 --
+ security/apparmor/secid.c         | 28 +++++-----------------------
+ 4 files changed, 8 insertions(+), 29 deletions(-)
+
+diff --git a/security/apparmor/include/secid.h b/security/apparmor/include/secid.h
+index 6a29aa43e595..bd83fc2c907d 100644
+--- a/security/apparmor/include/secid.h
++++ b/security/apparmor/include/secid.h
+@@ -24,10 +24,8 @@ int apparmor_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid);
+ void apparmor_release_secctx(char *secdata, u32 seclen);
+ 
+ 
+-int aa_alloc_secid(struct aa_label *label, gfp_t gfp);
++u32 aa_alloc_secid(struct aa_label *label, gfp_t gfp);
+ void aa_free_secid(u32 secid);
+ void aa_secid_update(u32 secid, struct aa_label *label);
+ 
+-void aa_secids_init(void);
+-
+ #endif /* __AA_SECID_H */
+diff --git a/security/apparmor/label.c b/security/apparmor/label.c
+index 747a734a0824..e2f6f813528b 100644
+--- a/security/apparmor/label.c
++++ b/security/apparmor/label.c
+@@ -403,7 +403,8 @@ bool aa_label_init(struct aa_label *label, int size, gfp_t gfp)
+ 	AA_BUG(!label);
+ 	AA_BUG(size < 1);
+ 
+-	if (aa_alloc_secid(label, gfp) < 0)
++	label->secid = aa_alloc_secid(label, gfp);
++	if (label->secid == AA_SECID_INVALID)
+ 		return false;
+ 
+ 	label->size = size;			/* doesn't include null */
+diff --git a/security/apparmor/lsm.c b/security/apparmor/lsm.c
+index 8844ba1c6dd5..c44922dc0b63 100644
+--- a/security/apparmor/lsm.c
++++ b/security/apparmor/lsm.c
+@@ -1688,8 +1688,6 @@ static int __init apparmor_init(void)
+ {
+ 	int error;
+ 
+-	aa_secids_init();
+-
+ 	error = aa_setup_dfa_engine();
+ 	if (error) {
+ 		AA_ERROR("Unable to setup dfa engine\n");
+diff --git a/security/apparmor/secid.c b/security/apparmor/secid.c
+index f8ec1691615d..9d5aae368187 100644
+--- a/security/apparmor/secid.c
++++ b/security/apparmor/secid.c
+@@ -28,8 +28,6 @@
+  * properly updating/freeing them
+  */
+ 
+-#define AA_FIRST_SECID 1
+-
+ static DEFINE_IDR(aa_secids);
+ static DEFINE_SPINLOCK(secid_lock);
+ 
+@@ -117,31 +115,20 @@ void apparmor_release_secctx(char *secdata, u32 seclen)
+ 
+ /**
+  * aa_alloc_secid - allocate a new secid for a profile
+- * @label: the label to allocate a secid for
+- * @gfp: memory allocation flags
+- *
+- * Returns: 0 with @label->secid initialized
+- *          <0 returns error with @label->secid set to AA_SECID_INVALID
+  */
+-int aa_alloc_secid(struct aa_label *label, gfp_t gfp)
++u32 aa_alloc_secid(struct aa_label *label, gfp_t gfp)
+ {
+ 	unsigned long flags;
+-	int ret;
++	u32 secid;
+ 
+ 	idr_preload(gfp);
+ 	spin_lock_irqsave(&secid_lock, flags);
+-	ret = idr_alloc(&aa_secids, label, AA_FIRST_SECID, 0, GFP_ATOMIC);
++	secid = idr_alloc(&aa_secids, label, 0, 0, GFP_ATOMIC);
++	/* XXX: Can return -ENOMEM */
+ 	spin_unlock_irqrestore(&secid_lock, flags);
+ 	idr_preload_end();
+ 
+-	if (ret < 0) {
+-		label->secid = AA_SECID_INVALID;
+-		return ret;
+-	}
+-
+-	AA_BUG(ret == AA_SECID_INVALID);
+-	label->secid = ret;
+-	return 0;
++	return secid;
+ }
+ 
+ /**
+@@ -156,8 +143,3 @@ void aa_free_secid(u32 secid)
+ 	idr_remove(&aa_secids, secid);
+ 	spin_unlock_irqrestore(&secid_lock, flags);
+ }
+-
+-void aa_secids_init(void)
+-{
+-	idr_init_base(&aa_secids, AA_FIRST_SECID);
+-}
+-- 
+2.25.1
+

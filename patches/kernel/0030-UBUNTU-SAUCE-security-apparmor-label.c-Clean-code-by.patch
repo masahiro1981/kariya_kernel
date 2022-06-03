@@ -1,0 +1,45 @@
+From 0a35aeac34a324eac4a1bcd25c8929562176703e Mon Sep 17 00:00:00 2001
+From: Mateusz Nosek <mateusznosek0@gmail.com>
+Date: Tue, 3 Mar 2020 19:30:23 +0100
+Subject: [PATCH 30/31] UBUNTU: SAUCE: security/apparmor/label.c: Clean code by
+ removing redundant instructions
+
+Previously 'label->proxy->label' value checking
+and conditional reassigning were done twice in the same function.
+The second one is redundant and can be removed.
+
+Fixes: 1296c52d1ce6 ("apparmor: fix potential label refcnt leak in aa_change_profile")
+Signed-off-by: Mateusz Nosek <mateusznosek0@gmail.com>
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ security/apparmor/label.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/security/apparmor/label.c b/security/apparmor/label.c
+index aab953145891..30da58c961ae 100644
+--- a/security/apparmor/label.c
++++ b/security/apparmor/label.c
+@@ -311,8 +311,6 @@ int aa_vec_unique(struct aa_profile **vec, int n, int flags)
+ 
+ static void label_destroy(struct aa_label *label)
+ {
+-	struct aa_label *tmp;
+-
+ 	AA_BUG(!label);
+ 
+ 	if (!label_isprofile(label)) {
+@@ -333,10 +331,6 @@ static void label_destroy(struct aa_label *label)
+ 
+ 	aa_free_secid(label->secid);
+ 
+-	tmp = rcu_dereference_protected(label->proxy->label, true);
+-	if (tmp == label)
+-		rcu_assign_pointer(label->proxy->label, NULL);
+-
+ 	aa_put_proxy(label->proxy);
+ 	label->proxy = (struct aa_proxy *) PROXY_POISON + 1;
+ }
+-- 
+2.25.1
+
