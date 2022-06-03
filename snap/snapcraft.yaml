@@ -42,9 +42,9 @@ parts:
       - CONFIG_DEBUG_INFO=n
       - CONFIG_NLS_ISO8859_1=y
     override-build: |
-      #cp $SNAPCRAFT_PROJECT_DIR/parts/patch/src/disable_strict-prototypes.patch $SNAPCRAFT_PART_SRC
+      cp -f $SNAPCRAFT_PROJECT_DIR/parts/patch/src/disable_strict-protptypes.patch $SNAPCRAFT_PART_SRC
       cd $SNAPCRAFT_PART_SRC
-      #git apply disable_strict-protptypes.patch
+      git apply disable_strict-protptypes.patch
       cp $SNAPCRAFT_PROJECT_DIR/.config $SNAPCRAFT_PART_BUILD
       cd $SNAPCRAFT_PART_BUILD
       snapcraftctl build
