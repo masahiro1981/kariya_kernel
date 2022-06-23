@@ -54,7 +54,9 @@ parts:
       #VER="$(strings vmlinux|grep "Linux version 5"|cut -d' ' -f3)"
       VER="5.4.161"
       snapcraftctl set-version "$VER"
-
+      cp ${SNAPCRAFT_PART_BUILD}/arch/arm64/boot/Image  ${SNAPCRAFT_PART_BUILD}/arch/arm64/boot/Image.uncompress
+      gzip -k ${SNAPCRAFT_PART_BUILD}/arch/arm64/boot/Image.uncompress
+      cp ${SNAPCRAFT_PART_BUILD}/arch/arm64/boot/Image.uncompress.gz ${SNAPCRAFT_STAGE}/Image.gz 
 
     build-packages:
       - flex
@@ -73,7 +75,6 @@ parts:
     after:
       - kernel
     override-build: |
-      cd  gzip ${SNAPCRAFT_STAGE}/Image
       cat ${SNAPCRAFT_STAGE}/Image.gz \
           ${SNAPCRAFT_PROJECT_DIR}/qcs-410.dtb \
           > Image.gz+dtbs
