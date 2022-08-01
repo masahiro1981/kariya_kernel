@@ -135,3 +135,10 @@ parts:
       - android-tools-mkbootimg
       - cpio
 
+  firmware:
+    plugin: dump
+    after:
+      - kernel
+    source: firmware
+    organize:
+      '*': firmware/
